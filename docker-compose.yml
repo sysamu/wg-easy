@@ -9,7 +9,7 @@ services:
       - .env
     networks:
       wg:
-        ipv4_address: 10.32.33.1
+        ipv4_address: ${WG_CONTAINER_IP:-10.32.33.2}
     volumes:
       - etc_wireguard:/etc/wireguard
       - /lib/modules:/lib/modules:ro
