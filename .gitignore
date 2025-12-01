@@ -1,0 +1,29 @@
+# Environment variables (contains sensitive data)
+.env
+
+# WireGuard configuration files (contains private keys)
+etc_wireguard/
+
+# Docker volumes
+volumes/
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.backup
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
