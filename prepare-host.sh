@@ -32,8 +32,16 @@ export $(cat .env | grep -v '^#' | grep -v '^$' | xargs)
 VPN_CIDR="${INIT_IPV4_CIDR:-10.32.33.0/24}"
 LAN_ALLOWED="${INIT_ALLOWED_IPS:-192.168.124.0/23}"
 
+# Detect the network interface (exclude docker and loopback)
+MAIN_IFACE=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
+if [ -z "$MAIN_IFACE" ]; then
+    echo -e "${RED}Error: Could not detect main network interface${NC}"
+    exit 1
+fi
+
 echo "VPN Network: ${VPN_CIDR}"
 echo "Allowed LANs: ${LAN_ALLOWED}"
+echo "Main Interface: ${MAIN_IFACE}"
 echo ""
 
 # Enable IP forwarding
@@ -59,7 +67,7 @@ if ! iptables -L DOCKER-USER -n >/dev/null 2>&1; then
     iptables -I FORWARD -j DOCKER-USER
 fi
 
-# Function to add rule if it doesn't exist
+# Function to add rule if it doesn't exist (filter table)
 add_rule_if_not_exists() {
     local chain=$1
     shift
@@ -68,6 +76,18 @@ add_rule_if_not_exists() {
         iptables -I "$chain" "$@"
     else
         echo "Rule already exists: iptables -I $chain $@"
+    fi
+}
+
+# Function to add NAT rule if it doesn't exist
+add_nat_rule_if_not_exists() {
+    local chain=$1
+    shift
+    if ! iptables -t nat -C "$chain" "$@" 2>/dev/null; then
+        echo "Adding NAT rule: iptables -t nat -A $chain $@"
+        iptables -t nat -A "$chain" "$@"
+    else
+        echo "NAT rule already exists: iptables -t nat -A $chain $@"
     fi
 }
 
@@ -90,6 +110,10 @@ for lan_network in "${ADDR_ARRAY[@]}"; do
 
     # Allow LAN to VPN return traffic (established connections)
     add_rule_if_not_exists DOCKER-USER -s "$lan_network" -d "$VPN_CIDR" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
+    # Add NAT/MASQUERADE for VPN to LAN traffic
+    # This makes VPN traffic appear as if it comes from the server's IP
+    add_nat_rule_if_not_exists POSTROUTING -s "$VPN_CIDR" -d "$lan_network" -o "$MAIN_IFACE" -j MASQUERADE
 done
 
 echo ""
@@ -97,6 +121,9 @@ echo -e "${GREEN}Host preparation completed successfully!${NC}"
 echo ""
 echo "Current iptables rules in DOCKER-USER chain:"
 iptables -L DOCKER-USER -n -v --line-numbers
+echo ""
+echo "Current NAT rules in POSTROUTING chain:"
+iptables -t nat -L POSTROUTING -n -v --line-numbers
 echo ""
 echo -e "${YELLOW}Note: These rules are not persistent across reboots.${NC}"
 echo "To make them persistent, install iptables-persistent:"
