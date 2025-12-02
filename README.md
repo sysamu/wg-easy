@@ -37,18 +37,39 @@ Edit `.env` and configure at minimum:
 - `INIT_PASSWORD`: A strong password
 - `INIT_HOST`: Your server's public IP or domain name
 
-### 3. Start the service
+### 3. Prepare the host system
+
+Run the preparation script to configure iptables rules and IP forwarding:
+
+```bash
+chmod +x prepare-host.sh
+sudo ./prepare-host.sh
+```
+
+This script will:
+- Enable IP forwarding
+- Configure iptables rules to allow traffic between VPN and your LANs
+- Read network configuration from your `.env` file
+
+**Note**: iptables rules are not persistent across reboots by default. To make them persistent:
+
+```bash
+sudo apt-get install iptables-persistent
+sudo netfilter-persistent save
+```
+
+### 4. Start the service
 
 ```bash
 docker compose up -d
 ```
 
-### 4. Access the Web UI
+### 5. Access the Web UI
 
 Open your browser and navigate to:
 - `http://your-server-ip:80` (or the port you configured in `PORT`)
 
-### 5. Remove initialization variables
+### 6. Remove initialization variables
 
 After the first successful startup, edit `.env` and remove or comment out all `INIT_*` variables to avoid exposing credentials.
 
@@ -79,6 +100,7 @@ INIT_ALLOWED_IPS=0.0.0.0/0
 ```
 .
 ├── docker-compose.yml    # Docker Compose configuration
+├── prepare-host.sh       # Host preparation script (iptables, IP forwarding)
 ├── .env                  # Your environment variables (git-ignored)
 ├── .env.example          # Environment variables template
 ├── .gitignore            # Protects sensitive files
